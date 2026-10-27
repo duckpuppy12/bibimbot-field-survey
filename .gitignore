@@ -1,0 +1,16 @@
+# 에디터·OS 부스러기
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+
+# 로그·임시
+*.log
+tmp/
+
+# 혹시라도 키를 파일에 적어 두는 일이 없게 막는다.
+# 지도·Pl@ntNet 키는 앱 설정 화면에서 기기에만 저장한다. 소스에 넣지 않는다.
+.env
+.env.*
+*.key
+secrets.json

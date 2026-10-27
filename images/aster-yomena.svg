@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 170" role="img" aria-label="쑥부쟁이 특징 도식">
+  <title>쑥부쟁이 — 연한 자주빛 큰 꽃이 적게 달린다</title>
+  <rect width="200" height="170" fill="#f7faf8"/>
+  <path d="M100 150 V70 M100 104 L68 82 M100 92 L134 76" fill="none" stroke="#4a7a52" stroke-width="2.8"/>
+  <g stroke="#7d6aa8" stroke-width="1.2">
+    <g fill="#cfc3e8">
+      <!-- 큰 꽃 1 -->
+      <g transform="translate(100 56)">
+        <g>
+          <ellipse cx="0" cy="-16" rx="4.5" ry="13"/><ellipse cx="0" cy="16" rx="4.5" ry="13"/>
+          <ellipse cx="-16" cy="0" rx="13" ry="4.5"/><ellipse cx="16" cy="0" rx="13" ry="4.5"/>
+          <ellipse cx="-11" cy="-11" rx="11" ry="4.5" transform="rotate(45)"/>
+          <ellipse cx="11" cy="11" rx="11" ry="4.5" transform="rotate(45)"/>
+          <ellipse cx="-11" cy="11" rx="4.5" ry="11" transform="rotate(45)"/>
+          <ellipse cx="11" cy="-11" rx="4.5" ry="11" transform="rotate(45)"/>
+        </g>
+      </g>
+      <!-- 큰 꽃 2 -->
+      <g transform="translate(66 78) scale(0.8)">
+        <ellipse cx="0" cy="-16" rx="4.5" ry="13"/><ellipse cx="0" cy="16" rx="4.5" ry="13"/>
+        <ellipse cx="-16" cy="0" rx="13" ry="4.5"/><ellipse cx="16" cy="0" rx="13" ry="4.5"/>
+      </g>
+      <!-- 큰 꽃 3 -->
+      <g transform="translate(136 72) scale(0.8)">
+        <ellipse cx="0" cy="-16" rx="4.5" ry="13"/><ellipse cx="0" cy="16" rx="4.5" ry="13"/>
+        <ellipse cx="-16" cy="0" rx="13" ry="4.5"/><ellipse cx="16" cy="0" rx="13" ry="4.5"/>
+      </g>
+    </g>
+  </g>
+  <g fill="#e0b534" stroke="#a8831f" stroke-width="1">
+    <circle cx="100" cy="56" r="7"/><circle cx="66" cy="78" r="5.5"/><circle cx="136" cy="72" r="5.5"/>
+  </g>
+  <path d="M100 126 C84 120 76 112 72 104 C86 108 96 116 100 126 Z" fill="#9ec9a4" stroke="#2f6137" stroke-width="2"/>
+  <text x="100" y="162" text-anchor="middle" font-size="11" fill="#33413a" font-family="sans-serif">자주빛 큰 꽃, 수가 적다</text>
+</svg>

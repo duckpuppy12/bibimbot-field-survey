@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 170" role="img" aria-label="미국쑥부쟁이 특징 도식">
+  <title>미국쑥부쟁이 — 작은 흰 꽃이 아주 많이, 좁은 잎</title>
+  <rect width="200" height="170" fill="#f7faf8"/>
+  <path d="M100 150 V60 M100 110 L72 78 M100 96 L130 70 M100 124 L76 104 M100 84 L124 96"
+        fill="none" stroke="#4a7a52" stroke-width="2.5"/>
+  <g fill="#ffffff" stroke="#8a8f88" stroke-width="1">
+    <g>
+      <circle cx="100" cy="56" r="9"/><circle cx="72" cy="74" r="9"/><circle cx="130" cy="66" r="9"/>
+      <circle cx="76" cy="100" r="8"/><circle cx="124" cy="92" r="8"/><circle cx="88" cy="62" r="7"/>
+      <circle cx="112" cy="74" r="7"/><circle cx="62" cy="90" r="7"/><circle cx="140" cy="82" r="7"/>
+      <circle cx="94" cy="80" r="6"/><circle cx="110" cy="56" r="6"/><circle cx="84" cy="90" r="6"/>
+    </g>
+  </g>
+  <g fill="#e0b534">
+    <circle cx="100" cy="56" r="3"/><circle cx="72" cy="74" r="3"/><circle cx="130" cy="66" r="3"/>
+    <circle cx="76" cy="100" r="2.5"/><circle cx="124" cy="92" r="2.5"/><circle cx="88" cy="62" r="2.5"/>
+    <circle cx="112" cy="74" r="2.5"/><circle cx="62" cy="90" r="2.5"/><circle cx="140" cy="82" r="2.5"/>
+  </g>
+  <path d="M100 136 L82 130 M100 130 L118 124" stroke="#2f6137" stroke-width="3" fill="none"/>
+  <text x="100" y="162" text-anchor="middle" font-size="11" fill="#33413a" font-family="sans-serif">흰 꽃이 빽빽하게 많다</text>
+</svg>

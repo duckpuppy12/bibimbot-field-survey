@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 170" role="img" aria-label="단풍잎돼지풀 특징 도식">
+  <title>단풍잎돼지풀 — 3~5갈래 넓은 잎, 길게 솟은 꽃대</title>
+  <rect width="200" height="170" fill="#f7faf8"/>
+  <!-- 줄기 -->
+  <path d="M100 150 V36" fill="none" stroke="#4a7a52" stroke-width="4"/>
+  <!-- 꽃대 (수꽃 이삭) -->
+  <g fill="#c9c05e" stroke="#8d8530" stroke-width="1">
+    <circle cx="100" cy="30" r="4"/><circle cx="94" cy="20" r="4"/><circle cx="106" cy="20" r="4"/>
+    <circle cx="100" cy="12" r="4"/>
+  </g>
+  <!-- 왼쪽 3갈래 잎 -->
+  <path d="M100 74 L74 66 L58 44 L70 40 L58 24 L84 32 L96 56 Z" fill="#9ec9a4" stroke="#2f6137" stroke-width="2.5"/>
+  <!-- 오른쪽 3갈래 잎 -->
+  <path d="M100 100 L126 92 L142 70 L130 66 L142 50 L116 58 L104 82 Z" fill="#9ec9a4" stroke="#2f6137" stroke-width="2.5"/>
+  <!-- 아래 작은 잎 -->
+  <path d="M100 128 L78 124 L66 108 L88 112 L98 118 Z" fill="#b6d9ba" stroke="#2f6137" stroke-width="2"/>
+  <text x="100" y="162" text-anchor="middle" font-size="11" fill="#33413a" font-family="sans-serif">잎 갈래가 넓다 (돼지풀은 가늘다)</text>
+</svg>
