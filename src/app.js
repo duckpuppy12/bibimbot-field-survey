@@ -2,6 +2,9 @@
 (function (global) {
   'use strict';
 
+  // 배포본이 최신인지 자가 진단에서 눈으로 확인하려고 둔다. 고칠 때마다 올린다.
+  var BUILD = '2026-10-28.1';
+
   var doc = global.document;
   var Catalog = global.BibimCatalog;
   var Storage = global.BibimStorage;
@@ -1683,6 +1686,138 @@
     });
   }
 
+  /* ── 자가 진단 ──────────────────────────────────────────────
+   * 현장에서 "안 된다"가 무엇 때문인지 이 기기에서 바로 보이게 한다.
+   */
+
+  function setupDiagnostics() {
+    $('btn-diagnose').addEventListener('click', runDiagnosis);
+
+    $('btn-copy-diagnosis').addEventListener('click', function () {
+      var text = $('diag-output').textContent;
+      if (global.navigator.clipboard && global.navigator.clipboard.writeText) {
+        global.navigator.clipboard.writeText(text)
+          .then(function () { toast('진단 결과를 복사했습니다.'); })
+          .catch(function () { fallbackCopy(text, function () { toast('진단 결과를 복사했습니다.'); }); });
+      } else {
+        fallbackCopy(text, function () { toast('진단 결과를 복사했습니다.'); });
+      }
+    });
+
+    $('btn-test-plantnet').addEventListener('click', testPlantnet);
+  }
+
+  function runDiagnosis() {
+    var out = $('diag-output');
+    var lines = [];
+    out.textContent = '확인하는 중...';
+
+    lines.push('[비빔봇 자가 진단] ' + Exp.formatDate(new Date().toISOString()));
+    lines.push('빌드: ' + BUILD);
+    lines.push('도감: ' + Catalog.catalogVersion() + ' (' + Catalog.counts().total + '종)');
+    lines.push('주소: ' + global.location.href);
+    lines.push('보안 연결(HTTPS): ' + (global.isSecureContext
+      ? 'OK' : '아니오 ← 이러면 위치 권한을 못 받습니다'));
+    lines.push('인터넷: ' + (global.navigator.onLine === false ? '끊김' : '연결됨'));
+    lines.push('지도 백엔드: ' + (state.mapView ? state.mapView.backend() : '없음') +
+      (state.mapTried ? '' : ' (지도 탭을 아직 안 열었음)'));
+    lines.push('Pl@ntNet 키: ' + (Identify.isConfigured() ? '저장됨' : '없음 ← 사진 식별이 안 됩니다'));
+    lines.push('지도 키(선택): ' + (Storage.getSetting('mapApiKey', '') ? '저장됨' : '없음 (OSM을 씁니다)'));
+    lines.push('기록: ' + state.observations.length + '건');
+    out.textContent = lines.join('\n');
+
+    var checks = [];
+
+    checks.push(Storage.openDb().then(function () {
+      return Storage.countPhotos().then(function (n) { return '저장소(IndexedDB): OK, 사진 ' + n + '장'; });
+    }).catch(function (err) {
+      return '저장소(IndexedDB): 실패 ← ' + err.message;
+    }));
+
+    checks.push(Promise.resolve().then(function () {
+      try {
+        global.localStorage.setItem('__diag', '1');
+        global.localStorage.removeItem('__diag');
+        return '설정 저장(localStorage): OK';
+      } catch (err) {
+        void err;
+        return '설정 저장(localStorage): 실패 ← 사생활 보호 모드면 키가 저장되지 않습니다';
+      }
+    }));
+
+    checks.push(Promise.resolve().then(function () {
+      if (!global.navigator.permissions || !global.navigator.permissions.query) {
+        return '위치 권한 상태: 확인 불가(브라우저가 알려 주지 않음)';
+      }
+      return global.navigator.permissions.query({ name: 'geolocation' }).then(function (res) {
+        var label = { granted: '허용됨', denied: '거부됨 ← 주소창 자물쇠에서 허용으로 바꾸세요', prompt: '아직 안 물어봄' };
+        return '위치 권한 상태: ' + (label[res.state] || res.state);
+      }).catch(function () {
+        return '위치 권한 상태: 확인 불가';
+      });
+    }));
+
+    checks.push(Loc.acquire({ timeoutMs: 12000 }).then(function (fix) {
+      return '위치 측정: OK · ' + fix.lat.toFixed(5) + ', ' + fix.lng.toFixed(5) +
+        ' · 정확도 ' + (fix.accuracyMeters == null ? '값 없음' : '약 ' + fix.accuracyMeters + 'm');
+    }).catch(function (err) {
+      return '위치 측정: 실패(' + err.kind + ') ← ' + err.message;
+    }));
+
+    Promise.all(checks).then(function (results) {
+      lines.push('');
+      results.forEach(function (line) { lines.push(line); });
+      lines.push('');
+      lines.push('브라우저: ' + global.navigator.userAgent);
+      out.textContent = lines.join('\n');
+    });
+  }
+
+  /** 실제로 한 번 호출해 본다. 성공해도 실패해도 하루 할당량 1건을 쓴다. */
+  function testPlantnet() {
+    var btn = $('btn-test-plantnet');
+    if (!Identify.isConfigured()) {
+      setStatus('plantnet-test-status', 'Pl@ntNet 키가 없습니다. 위 칸에 키를 먼저 저장해 주세요.', 'error');
+      return;
+    }
+    btn.disabled = true;
+    setStatus('plantnet-test-status', '시험 요청을 보내는 중...', null);
+
+    makeTestImage().then(function (blob) {
+      return Identify.identify([{ blob: blob }], 'auto');
+    }).then(function (result) {
+      setStatus('plantnet-test-status',
+        '연결 OK. 키가 정상입니다. 후보 ' + result.candidates.length + '건' +
+        (result.remaining == null ? '' : ', 오늘 남은 횟수 ' + result.remaining + '건') + '.', 'ok');
+    }).catch(function (err) {
+      if (err.kind === 'no-match') {
+        // 시험용 단색 그림이라 못 맞히는 게 정상이다. 여기까지 왔으면 인증은 통과한 것이다.
+        setStatus('plantnet-test-status',
+          '연결 OK. 키와 도메인 설정이 정상입니다. (시험 그림이라 식물 후보는 안 나옵니다)', 'ok');
+      } else {
+        setStatus('plantnet-test-status', '연결 실패: ' + err.message, 'error');
+      }
+    }).then(function () {
+      btn.disabled = false;
+    });
+  }
+
+  function makeTestImage() {
+    return new Promise(function (resolve, reject) {
+      var canvas = doc.createElement('canvas');
+      canvas.width = 64;
+      canvas.height = 64;
+      var ctx = canvas.getContext('2d');
+      if (!ctx) { reject(new Error('이 브라우저에서 시험 그림을 만들지 못했습니다.')); return; }
+      ctx.fillStyle = '#2f6137';
+      ctx.fillRect(0, 0, 64, 64);
+      canvas.toBlob(function (blob) {
+        if (blob) resolve(blob);
+        else reject(new Error('시험 그림을 만들지 못했습니다.'));
+      }, 'image/jpeg', 0.8);
+    });
+  }
+
   /* ── 공통 렌더 / 부트 ──────────────────────────────────────── */
 
   function renderAll() {
@@ -1744,6 +1879,7 @@
     setupResults();
     setupCatalogTab();
     setupSettings();
+    setupDiagnostics();
     renderCatalog();
     renderFix();
 

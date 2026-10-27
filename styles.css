@@ -376,6 +376,20 @@ textarea.input { min-height: 72px; resize: vertical; }
 .obs-photos img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
 
 /* ── 통계 ───────────────────────────────────────────────────── */
+.diag {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  background: var(--gray-bg);
+  border-radius: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
 .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .stat {
   border: 1px solid var(--line);

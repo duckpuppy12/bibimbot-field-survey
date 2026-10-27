@@ -288,6 +288,21 @@
 
   <!-- ─────────────── 설정 탭 ─────────────── -->
   <section class="panel" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
+    <div class="card">
+      <h2 class="card__title">자가 진단</h2>
+      <p class="muted">
+        뭔가 안 될 때 여기를 먼저 누른다. 이 기기에서 무엇이 되고 무엇이 막혔는지 보여 준다.
+        결과를 복사해서 보내면 원인을 찾기 쉽다.
+      </p>
+      <div class="btn-row">
+        <button type="button" class="btn btn--primary" id="btn-diagnose">지금 상태 확인</button>
+        <button type="button" class="btn" id="btn-copy-diagnosis">결과 복사</button>
+      </div>
+      <pre class="diag" id="diag-output" aria-live="polite">아직 확인하지 않았다.</pre>
+      <button type="button" class="btn" id="btn-test-plantnet">Pl@ntNet 연결 시험 (하루 500건 중 1건 사용)</button>
+      <p class="status" id="plantnet-test-status" role="status"></p>
+    </div>
+
     <div class="callout">
       <p class="callout__title">이 앱이 쓰는 바깥 서비스는 둘뿐이다</p>
       <ul>
