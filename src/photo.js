@@ -73,10 +73,43 @@
     });
   }
 
+  /** 켜져 있는 카메라 화면에서 한 장을 떠낸다. 저장 규격은 파일 첨부와 같다. */
+  function captureFromVideo(video, observationId) {
+    var w = video.videoWidth;
+    var h = video.videoHeight;
+    if (!w || !h) return Promise.reject(new Error('카메라 화면이 아직 준비되지 않았습니다.'));
+    var scale = Math.min(1, MAX_EDGE / Math.max(w, h));
+    var outW = Math.max(1, Math.round(w * scale));
+    var outH = Math.max(1, Math.round(h * scale));
+    var canvas = global.document.createElement('canvas');
+    canvas.width = outW;
+    canvas.height = outH;
+    var ctx = canvas.getContext('2d');
+    if (!ctx) return Promise.reject(new Error('이 브라우저에서 사진을 처리할 수 없습니다.'));
+    ctx.drawImage(video, 0, 0, outW, outH);
+    return canvasToBlob(canvas, 'image/jpeg', JPEG_QUALITY).then(function (blob) {
+      return {
+        id: uuid(),
+        observationId: observationId,
+        blob: blob,
+        mimeType: 'image/jpeg',
+        width: outW,
+        height: outH,
+        createdAt: new Date().toISOString()
+      };
+    });
+  }
+
   function objectUrl(photo) {
     if (!photo || !photo.blob) return '';
     return global.URL.createObjectURL(photo.blob);
   }
 
-  global.BibimPhoto = { MAX_EDGE: MAX_EDGE, uuid: uuid, prepare: prepare, objectUrl: objectUrl };
+  global.BibimPhoto = {
+    MAX_EDGE: MAX_EDGE,
+    uuid: uuid,
+    prepare: prepare,
+    captureFromVideo: captureFromVideo,
+    objectUrl: objectUrl
+  };
 })(window);

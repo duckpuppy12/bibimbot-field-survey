@@ -35,7 +35,25 @@
     <!-- 1단계: 사진 찍고 Pl@ntNet으로 이름 찾기 (주 경로) -->
     <div class="card">
       <h2 class="card__title"><span class="step">1</span> 사진 찍고 이름 찾기</h2>
-      <input class="file" id="photo-input" type="file" accept="image/*" capture="environment" multiple>
+
+      <div class="camera" id="camera-box">
+        <div class="btn-row">
+          <button type="button" class="btn btn--primary" id="btn-camera-start">카메라 켜기</button>
+          <button type="button" class="btn" id="btn-camera-stop" hidden>카메라 끄기</button>
+        </div>
+        <video class="camera__view" id="camera-view" playsinline muted hidden></video>
+        <button type="button" class="btn btn--quick" id="btn-camera-shot" hidden>찍기</button>
+        <label class="check">
+          <input type="checkbox" id="auto-photo">
+          빠른 기록할 때 자동으로 한 장 찍기
+        </label>
+        <p class="status" id="camera-status" role="status"></p>
+      </div>
+
+      <details class="details">
+        <summary>앨범에서 고르거나 기본 카메라로 찍기</summary>
+        <input class="file" id="photo-input" type="file" accept="image/*" capture="environment" multiple>
+      </details>
       <p class="muted">긴 변 1600px로 줄인 사본만 앱에 저장한다. 휴대폰의 원본 사진은 그대로 남는다.</p>
       <div class="thumbs" id="photo-thumbs"></div>
       <p class="hint" id="photo-hint"></p>

@@ -266,6 +266,27 @@ textarea.input { min-height: 72px; resize: vertical; }
 .verdict__credit { font-size: 0.74rem; color: var(--ink-soft); margin: 4px 0 0; }
 
 /* ── 사진 썸네일 ────────────────────────────────────────────── */
+.camera__view {
+  width: 100%;
+  max-height: 300px;
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #000;
+  display: block;
+  object-fit: cover;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--tap);
+  font-size: 0.88rem;
+  margin-top: 6px;
+  cursor: pointer;
+}
+.check input { width: 22px; height: 22px; flex: none; }
+
 .identify {
   margin-top: 12px;
   padding-top: 12px;

@@ -3,7 +3,7 @@
   'use strict';
 
   // 배포본이 최신인지 자가 진단에서 눈으로 확인하려고 둔다. 고칠 때마다 올린다.
-  var BUILD = '2026-10-28.1';
+  var BUILD = '2026-10-28.2';
 
   var doc = global.document;
   var Catalog = global.BibimCatalog;
@@ -23,6 +23,7 @@
     lensOpened: false,
     saving: false,
     quick: { count: 0 },
+    camera: { stream: null },
     draft: newDraft(),
     objectUrls: []
   };
@@ -490,24 +491,32 @@
           toast('이미 기록한 자리입니다');
           return null;
         }
-        var observation = composeObservation(name, fix, { id: Photo.uuid() });
-        return Storage.saveObservation(observation, []).then(function () {
-          return Storage.listObservations();
-        }).then(function (rows) {
-          if (!rows.some(function (o) { return o.id === observation.id; })) {
-            throw new Error('저장한 기록을 다시 읽지 못했습니다.');
-          }
-          state.observations = rows;
-          state.quick.count += 1;
-          persistDraft();
-          renderAll();
-          renderQuickCard();
-          setStatus('quick-status',
-            '기록했습니다. ' + fix.lat.toFixed(5) + ', ' + fix.lng.toFixed(5) +
-            (typeof fix.accuracyMeters === 'number' ? ' · 정확도 약 ' + fix.accuracyMeters + 'm' : '') + '.',
-            'ok');
-          toast(name + ' ' + state.quick.count + '번째 기록');
-          return observation;
+        var id = Photo.uuid();
+        return autoPhotoFor(id).then(function (photos) {
+          var observation = composeObservation(name, fix, {
+            id: id,
+            photoIds: photos.map(function (p) { return p.id; })
+          });
+          return Storage.saveObservation(observation, photos).then(function () {
+            return Storage.listObservations();
+          }).then(function (rows) {
+            if (!rows.some(function (o) { return o.id === observation.id; })) {
+              throw new Error('저장한 기록을 다시 읽지 못했습니다.');
+            }
+            state.observations = rows;
+            state.quick.count += 1;
+            persistDraft();
+            renderAll();
+            renderQuickCard();
+            var wantedPhoto = $('auto-photo').checked;
+            setStatus('quick-status',
+              '기록했습니다. ' + fix.lat.toFixed(5) + ', ' + fix.lng.toFixed(5) +
+              (typeof fix.accuracyMeters === 'number' ? ' · 정확도 약 ' + fix.accuracyMeters + 'm' : '') +
+              (photos.length ? ' · 사진 1장' : (wantedPhoto ? ' · 사진은 담지 못했습니다(카메라 확인)' : '')) + '.',
+              'ok');
+            toast(name + ' ' + state.quick.count + '번째 기록');
+            return observation;
+          });
         });
       }).catch(function (err) {
         var message = err && err.name === 'QuotaExceededError'
@@ -639,6 +648,108 @@
       state.draft.photos = state.draft.photos.filter(function (p) { return p.id !== id; });
       renderThumbs();
     });
+  }
+
+  /* ── 앱 안 카메라 ───────────────────────────────────────────
+   * 파일 선택 → 카메라 앱 → 촬영 → 확인을 거치지 않고, 화면에 담고 한 번만 누른다.
+   * 빠른 기록에 맞춰 자동으로 한 장 남기는 것도 여기서 한다(식별 호출은 하지 않는다).
+   */
+
+  function setupCamera() {
+    var autoBox = $('auto-photo');
+    autoBox.checked = !!Storage.getSetting('autoPhoto', false);
+    autoBox.addEventListener('change', function () {
+      Storage.setSetting('autoPhoto', autoBox.checked);
+      if (autoBox.checked && !state.camera.stream) startCamera();
+    });
+
+    $('btn-camera-start').addEventListener('click', function () { startCamera(); });
+    $('btn-camera-stop').addEventListener('click', stopCamera);
+    $('btn-camera-shot').addEventListener('click', function () {
+      var btn = this;
+      btn.disabled = true;
+      takeShot().then(function () {
+        setStatus('camera-status', '사진 ' + state.draft.photos.length + '장 담았다. 저장을 눌러야 기기에 남는다.', 'ok');
+      }).catch(function (err) {
+        setStatus('camera-status', err.message, 'error');
+      }).then(function () {
+        btn.disabled = false;
+      });
+    });
+
+    global.addEventListener('pagehide', stopCamera);
+  }
+
+  function startCamera() {
+    var media = global.navigator.mediaDevices;
+    if (!media || !media.getUserMedia) {
+      setStatus('camera-status',
+        '이 브라우저에서는 앱 안 카메라를 쓸 수 없습니다. 아래 "앨범에서 고르거나 기본 카메라로 찍기"를 쓰세요.', 'warn');
+      return Promise.resolve(false);
+    }
+    setStatus('camera-status', '카메라를 켜는 중...', null);
+    // 뒷면 카메라를 우선 쓰되, 없으면 아무 카메라나 받는다.
+    return media.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
+      .then(function (stream) {
+        state.camera.stream = stream;
+        var video = $('camera-view');
+        video.srcObject = stream;
+        video.hidden = false;
+        var played = video.play();
+        return played && played.catch ? played.catch(function () {}) : null;
+      })
+      .then(function () {
+        $('btn-camera-start').hidden = true;
+        $('btn-camera-stop').hidden = false;
+        $('btn-camera-shot').hidden = false;
+        setStatus('camera-status', '카메라가 켜졌습니다. 식물을 화면에 담고 "찍기"를 누르세요.', 'ok');
+        return true;
+      })
+      .catch(function (err) {
+        var message;
+        if (err && err.name === 'NotAllowedError') {
+          message = '카메라 권한이 거부되었습니다. 주소창 자물쇠 → 권한 → 카메라를 허용으로 바꿔 주세요.';
+        } else if (err && err.name === 'NotFoundError') {
+          message = '이 기기에서 카메라를 찾지 못했습니다.';
+        } else if (err && err.name === 'NotReadableError') {
+          message = '다른 앱이 카메라를 쓰고 있습니다. 그 앱을 닫고 다시 시도해 주세요.';
+        } else {
+          message = '카메라를 켜지 못했습니다: ' + ((err && err.message) || '알 수 없는 오류');
+        }
+        setStatus('camera-status', message, 'error');
+        return false;
+      });
+  }
+
+  function stopCamera() {
+    if (state.camera.stream) {
+      state.camera.stream.getTracks().forEach(function (track) { track.stop(); });
+      state.camera.stream = null;
+    }
+    var video = $('camera-view');
+    video.srcObject = null;
+    video.hidden = true;
+    $('btn-camera-start').hidden = false;
+    $('btn-camera-stop').hidden = true;
+    $('btn-camera-shot').hidden = true;
+  }
+
+  function takeShot() {
+    if (!state.camera.stream) return Promise.reject(new Error('카메라가 꺼져 있습니다.'));
+    return Photo.captureFromVideo($('camera-view'), state.draft.editingId || 'draft')
+      .then(function (photo) {
+        state.draft.photos.push(photo);
+        renderThumbs();
+        return photo;
+      });
+  }
+
+  /** 빠른 기록에 사진 한 장을 같이 남긴다. 실패해도 좌표 기록은 막지 않는다. */
+  function autoPhotoFor(observationId) {
+    if (!$('auto-photo').checked || !state.camera.stream) return Promise.resolve([]);
+    return Photo.captureFromVideo($('camera-view'), observationId)
+      .then(function (photo) { return [photo]; })
+      .catch(function () { return []; });
   }
 
   function renderThumbs() {
@@ -1871,6 +1982,7 @@
     setupLens();
     setupNameSearch();
     setupPhotos();
+    setupCamera();
     setupLocation();
     setupSave();
     setupQuickRecord();
