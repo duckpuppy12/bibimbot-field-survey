@@ -1551,7 +1551,7 @@
       if (!key) { setStatus('plantnet-status', '키를 입력해 주세요.', 'error'); return; }
       var ok = Storage.setSetting('plantnetApiKey', key);
       setStatus('plantnet-status', ok
-        ? '키를 이 기기에 저장했습니다. 조사 탭 3단계에서 사진으로 이름 찾기를 쓸 수 있습니다.'
+        ? '키를 이 기기에 저장했습니다. 조사 탭 1단계에서 사진으로 이름 찾기를 쓸 수 있습니다.'
         : '이 브라우저에 키를 저장하지 못했습니다(사생활 보호 모드일 수 있음). 이번 조사 동안만 쓰입니다.',
         ok ? 'ok' : 'warn');
     });
