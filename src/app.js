@@ -3,7 +3,7 @@
   'use strict';
 
   // 배포본이 최신인지 자가 진단에서 눈으로 확인하려고 둔다. 고칠 때마다 올린다.
-  var BUILD = '2026-10-28.4';
+  var BUILD = '2026-10-28.5';
 
   var doc = global.document;
   var Catalog = global.BibimCatalog;
