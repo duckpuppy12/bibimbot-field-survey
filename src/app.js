@@ -3,7 +3,7 @@
   'use strict';
 
   // 배포본이 최신인지 자가 진단에서 눈으로 확인하려고 둔다. 고칠 때마다 올린다.
-  var BUILD = '2026-10-28.3';
+  var BUILD = '2026-10-28.4';
 
   var doc = global.document;
   var Catalog = global.BibimCatalog;
@@ -13,6 +13,7 @@
   var MapMod = global.BibimMap;
   var Exp = global.BibimExport;
   var Identify = global.BibimIdentify;
+  var Exif = global.BibimExif;
 
   var state = {
     survey: null,
@@ -24,6 +25,7 @@
     saving: false,
     quick: { count: 0 },
     camera: { stream: null },
+    bulk: [],
     draft: newDraft(),
     objectUrls: []
   };
@@ -810,6 +812,157 @@
         '<button type="button" data-photo-id="' + esc(photo.id) + '" aria-label="이 사진 빼기">×</button></div>';
     }).join('');
     refreshSaveState();
+  }
+
+  /* ── 사진 여러 장 한 번에 올리기 ────────────────────────────
+   * 기본 카메라로 찍은 사진에는 찍은 자리의 좌표(EXIF GPS)가 들어 있다.
+   * 그걸 읽어 사진 한 장당 기록 하나를 만든다. 현장에서는 찍기만 하면 된다.
+   */
+
+  function setupBulkImport() {
+    $('bulk-input').addEventListener('change', function (event) {
+      var files = Array.prototype.slice.call(event.target.files || []);
+      state.bulk = [];
+      if (!files.length) {
+        $('bulk-preview').innerHTML = '';
+        $('btn-bulk-import').disabled = true;
+        return;
+      }
+      setStatus('bulk-status', '사진 ' + files.length + '장에서 위치를 읽는 중...', null);
+
+      var chain = Promise.resolve();
+      files.forEach(function (file) {
+        chain = chain.then(function () {
+          return Exif.read(file).then(function (meta) {
+            state.bulk.push({ file: file, meta: meta });
+          });
+        });
+      });
+
+      chain.then(function () {
+        renderBulkPreview();
+      }).catch(function (err) {
+        setStatus('bulk-status', '사진을 읽지 못했습니다: ' + err.message, 'error');
+      });
+    });
+
+    $('btn-bulk-import').addEventListener('click', runBulkImport);
+  }
+
+  function renderBulkPreview() {
+    var withCoord = state.bulk.filter(function (row) {
+      return Loc.isValidCoord(row.meta.lat, row.meta.lng);
+    });
+    var rows = state.bulk.map(function (row) {
+      var ok = Loc.isValidCoord(row.meta.lat, row.meta.lng);
+      var detail = ok
+        ? row.meta.lat.toFixed(5) + ', ' + row.meta.lng.toFixed(5) +
+          (row.meta.accuracyMeters == null ? '' : ' · 약 ' + row.meta.accuracyMeters + 'm') +
+          (row.meta.takenAt ? ' · ' + Exp.formatDate(row.meta.takenAt) : '')
+        : '좌표 없음 — 이 사진은 건너뜁니다';
+      return '<li class="obs-item"><div class="obs-item__head">' +
+        '<span class="obs-item__name">' + esc(row.file.name) + '</span>' +
+        '<span class="' + (ok ? 'badge badge--green' : 'badge badge--gray') + '">' +
+        (ok ? '● 위치 있음' : '■ 위치 없음') + '</span></div>' +
+        '<p class="obs-item__meta">' + esc(detail) + '</p></li>';
+    });
+
+    $('bulk-preview').innerHTML = '<ul class="obs-list">' + rows.join('') + '</ul>';
+    $('btn-bulk-import').disabled = withCoord.length === 0;
+    setStatus('bulk-status',
+      '사진 ' + state.bulk.length + '장 중 ' + withCoord.length + '장에 위치가 있습니다.' +
+      (withCoord.length ? '' : ' 아래 "좌표가 없다고 나올 때"를 확인해 주세요.'),
+      withCoord.length ? 'ok' : 'warn');
+  }
+
+  function runBulkImport() {
+    var btn = $('btn-bulk-import');
+    var usable = state.bulk.filter(function (row) {
+      return Loc.isValidCoord(row.meta.lat, row.meta.lng);
+    });
+    if (!usable.length) return;
+
+    var typed = $('bulk-name').value.trim();
+    var plant = typed ? Catalog.exactMatch(typed) : null;
+    if (typed && !plant) {
+      var hits = Catalog.search(typed, 1);
+      plant = hits.length && hits[0].score >= 75 ? hits[0].plant : null;
+    }
+    var name = plant ? plant.nameKo : (typed || '이름 미확정');
+    var category = plant ? Catalog.decide(plant).category : 'needs-check';
+
+    btn.disabled = true;
+    btn.textContent = '가져오는 중...';
+    setStatus('bulk-status', '', null);
+
+    var imported = 0;
+    var skipped = 0;
+    var failed = 0;
+
+    var chain = Promise.resolve();
+    usable.forEach(function (row) {
+      chain = chain.then(function () {
+        var fix = Loc.photoFix(row.meta.lat, row.meta.lng, row.meta.accuracyMeters, row.meta.takenAt);
+        // 같은 이름이 가까이 이미 있으면 건너뛴다. 빠른 기록과 같은 규칙이다.
+        if (Loc.findNearbyDuplicates(fix, name, state.observations).length) {
+          skipped += 1;
+          return null;
+        }
+        var id = Photo.uuid();
+        return Photo.prepare(row.file, id).then(function (photo) {
+          var observation = {
+            id: id,
+            surveyId: state.survey.id,
+            plantId: plant ? plant.id : null,
+            enteredName: typed || '',
+            confirmedName: name,
+            categorySnapshot: category,
+            catalogVersion: Catalog.catalogVersion(),
+            identificationMethod: 'manual',
+            verificationStatus: plant ? plant.verificationStatus : 'needs-review',
+            lat: fix.lat,
+            lng: fix.lng,
+            accuracyMeters: fix.accuracyMeters,
+            locationSource: fix.locationSource,
+            locationCapturedAt: fix.locationCapturedAt,
+            photoIds: [photo.id],
+            note: '사진에서 가져온 기록 (' + row.file.name + ')',
+            createdAt: fix.locationCapturedAt,
+            updatedAt: new Date().toISOString(),
+            removalStatus: 'unresolved',
+            removedAt: null
+          };
+          return Storage.saveObservation(observation, [photo]).then(function () {
+            return Storage.listObservations();
+          }).then(function (rows) {
+            state.observations = rows;      // 다음 사진의 중복 판정에 바로 반영한다.
+            imported += 1;
+          });
+        }).catch(function () {
+          failed += 1;
+        });
+      });
+    });
+
+    chain.then(function () {
+      return reload();
+    }).then(function () {
+      var parts = [imported + '건을 가져왔습니다'];
+      if (skipped) parts.push('가까운 중복 ' + skipped + '건은 건너뜀');
+      if (failed) parts.push('사진 처리 실패 ' + failed + '건');
+      var noCoord = state.bulk.length - usable.length;
+      if (noCoord) parts.push('위치 없는 사진 ' + noCoord + '장은 제외');
+      setStatus('bulk-status', parts.join(', ') + '.', imported ? 'ok' : 'warn');
+      if (imported) toast('사진에서 ' + imported + '건을 가져왔습니다');
+      state.bulk = [];
+      $('bulk-input').value = '';
+      $('bulk-preview').innerHTML = '';
+    }).catch(function (err) {
+      setStatus('bulk-status', '가져오다 멈췄습니다: ' + err.message + ' 이미 들어간 기록은 남아 있습니다.', 'error');
+    }).then(function () {
+      btn.disabled = false;
+      btn.textContent = '이 사진들로 기록 만들기';
+    });
   }
 
   /* ── 위치 (FR-04) ──────────────────────────────────────────── */
@@ -2033,6 +2186,7 @@
     setupNameSearch();
     setupPhotos();
     setupCamera();
+    setupBulkImport();
     setupLocation();
     setupSave();
     setupQuickRecord();

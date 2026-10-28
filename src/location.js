@@ -170,9 +170,22 @@
 
   function sourceLabel(source) {
     if (source === 'gps') return 'GPS 측정';
+    if (source === 'photo-exif') return '사진에 기록된 위치';
     if (source === 'manual') return '지도에서 직접 선택';
     if (source === 'demo') return '실내 시연 좌표';
     return '알 수 없음';
+  }
+
+  /** 사진 EXIF에서 읽은 좌표. 찍은 그 자리의 기기 GPS 값이다. */
+  function photoFix(lat, lng, accuracyMeters, takenAt) {
+    if (!isValidCoord(lat, lng)) return null;
+    return {
+      lat: lat,
+      lng: lng,
+      accuracyMeters: typeof accuracyMeters === 'number' ? accuracyMeters : null,
+      locationSource: 'photo-exif',
+      locationCapturedAt: takenAt || new Date().toISOString()
+    };
   }
 
   /**
@@ -208,6 +221,7 @@
     effectiveDuplicateRadius: effectiveDuplicateRadius,
     acquire: acquire,
     manualFix: manualFix,
+    photoFix: photoFix,
     demoFix: demoFix,
     review: review,
     sourceLabel: sourceLabel,

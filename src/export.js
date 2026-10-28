@@ -5,7 +5,8 @@
   var APP_ID = 'bibimbot-field-survey';
   var BACKUP_SCHEMA_VERSION = 1;
 
-  var LOCATION_SOURCES = ['gps', 'manual', 'demo'];
+  // 'photo-exif' 는 사진에 박혀 있던 촬영 위치.
+  var LOCATION_SOURCES = ['gps', 'photo-exif', 'manual', 'demo'];
   var REMOVAL_STATUSES = ['unresolved', 'reported', 'removed'];
   // 'photo-api' 는 Pl@ntNet 사진 식별. PRD 8절의 세 값에 더해 쓴다.
   var ID_METHODS = ['lens-manual', 'manual', 'team-model', 'photo-api'];

@@ -153,6 +153,33 @@
       </p>
     </div>
 
+    <!-- 현장에서 찍어 두고 돌아와 한 번에 올리는 길 -->
+    <div class="card">
+      <h2 class="card__title">사진 여러 장 한 번에 올리기</h2>
+      <p class="muted">
+        휴대폰 <strong>기본 카메라</strong>로 찍은 사진에는 찍은 자리의 좌표가 들어 있다.
+        현장에서는 찍기만 하고, 돌아와서 한 번에 올리면 좌표가 그대로 핀이 된다.
+      </p>
+      <input class="file" id="bulk-input" type="file" accept="image/jpeg,image/*" multiple>
+      <div id="bulk-preview"></div>
+
+      <label class="label" for="bulk-name">이 사진들의 식물 이름 (비우면 '확인 필요'로 저장)</label>
+      <input class="input" id="bulk-name" type="text" autocomplete="off" placeholder="예: 가시박">
+      <button type="button" class="btn btn--primary" id="btn-bulk-import" disabled>이 사진들로 기록 만들기</button>
+      <p class="status" id="bulk-status" role="status"></p>
+
+      <details class="details">
+        <summary>좌표가 없다고 나올 때</summary>
+        <ul class="bullets">
+          <li><strong>카메라 위치 태그가 꺼져 있으면</strong> 사진에 좌표가 안 들어간다.
+            Android는 카메라 앱 설정 → 위치 태그, iPhone은 설정 → 개인정보 보호 → 위치 서비스 → 카메라에서 켠다.</li>
+          <li><strong>메신저로 주고받은 사진</strong>은 좌표가 지워진다. 원본 파일을 그대로 올려야 한다.</li>
+          <li><strong>앱 안 카메라로 찍은 사진</strong>에는 좌표가 없다. 그건 찍는 즉시 기록되므로 여기에 올릴 필요가 없다.</li>
+          <li>실내나 지하에서 찍으면 좌표가 안 잡혔을 수 있다.</li>
+        </ul>
+      </details>
+    </div>
+
     <!-- 3단계: 위치 -->
     <div class="card">
       <h2 class="card__title"><span class="step">3</span> 위치 확인</h2>
@@ -513,6 +540,7 @@
 <script src="src/storage.js"></script>
 <script src="src/location.js"></script>
 <script src="src/photo.js"></script>
+<script src="src/exif.js"></script>
 <script src="src/identify.js"></script>
 <script src="src/map.js"></script>
 <script src="src/export.js"></script>
