@@ -62,7 +62,23 @@
         <label class="label" for="organ-select">사진에 찍힌 부분</label>
         <select class="input" id="organ-select"></select>
         <button type="button" class="btn btn--primary" id="btn-identify-photo">사진으로 이름 찾기</button>
+        <button type="button" class="btn" id="btn-share-lens">사진을 렌즈·다른 앱으로 보내기</button>
         <p class="status" id="identify-status" role="status"></p>
+
+        <details class="details">
+          <summary>잘 못 맞힐 때 — 이렇게 찍으면 올라간다</summary>
+          <ul class="bullets">
+            <li><strong>꽃 → 열매 → 잎</strong> 순으로 잘 맞힌다. 줄기·껍질은 다른 데가 안 보일 때만.</li>
+            <li><strong>한 부위를 화면 가득</strong> 채운다. 풀밭 전체를 멀리서 찍으면 거의 못 맞힌다.</li>
+            <li><strong>같은 포기를 여러 장</strong>(최대 5장) 찍어 두고 한 번에 보낸다. 부위를 섞어도 좋다.</li>
+            <li>초점을 맞추고 흔들리지 않게. 800×800보다 작으면 성능이 보장되지 않는다.</li>
+          </ul>
+          <p class="muted">
+            그래도 안 되면 <strong>사진을 렌즈·다른 앱으로 보내기</strong>로 Google 렌즈에 보내 확인한 뒤,
+            이름을 복사해 2단계에 붙여 넣는다. 렌즈 결과가 앱으로 자동으로 돌아오지는 않는다.
+          </p>
+        </details>
+
         <p class="muted">
           Pl@ntNet이 학명 후보를 돌려주면 비빔봇 도감과 맞춰 아래 2단계에 올린다.
           누르면 첨부한 사진이 <strong>Pl@ntNet 서버로 전송된다.</strong>

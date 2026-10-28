@@ -5,7 +5,10 @@
   'use strict';
 
   var MAX_EDGE = 1600;
-  var JPEG_QUALITY = 0.82;
+  // Pl@ntNet 권장값이 품질 90% 정도다. 서버가 긴 변을 1280px로 줄이므로 해상도는 넉넉하고,
+  // 800x800보다 작으면 식별 성능이 보장되지 않는다.
+  var JPEG_QUALITY = 0.9;
+  var MIN_GOOD_EDGE = 800;
 
   function uuid() {
     if (global.crypto && global.crypto.randomUUID) return global.crypto.randomUUID();
@@ -105,8 +108,16 @@
     return global.URL.createObjectURL(photo.blob);
   }
 
+  /** 식별에 쓰기엔 너무 작은 사진인지. 경고만 하고 막지는 않는다. */
+  function isTooSmallForId(photo) {
+    if (!photo) return false;
+    return Math.min(photo.width || 0, photo.height || 0) < MIN_GOOD_EDGE;
+  }
+
   global.BibimPhoto = {
     MAX_EDGE: MAX_EDGE,
+    MIN_GOOD_EDGE: MIN_GOOD_EDGE,
+    isTooSmallForId: isTooSmallForId,
     uuid: uuid,
     prepare: prepare,
     captureFromVideo: captureFromVideo,
