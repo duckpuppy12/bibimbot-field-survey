@@ -2,8 +2,14 @@
 (function (global) {
   'use strict';
 
-  // 배포본이 최신인지 자가 진단에서 눈으로 확인하려고 둔다. 고칠 때마다 올린다.
-  var BUILD = '2026-10-28.6';
+  // 배포본이 최신인지 자가 진단에서 눈으로 확인하려고 둔다.
+  // 고칠 때마다 올리고, sw.js 의 VERSION 도 같은 값으로 맞춘다(안 맞추면 기기가 옛 파일을 계속 쓴다).
+  var BUILD = '2026-10-28.7';
+
+  // 기록 하나에 담을 수 있는 사진 장수. 저사양 휴대폰에서 리사이즈가 밀리지 않게 막아 둔다.
+  var MAX_DRAFT_PHOTOS = 10;
+  // 한 번에 올릴 수 있는 사진 장수(EXIF 일괄 올리기).
+  var MAX_BULK_PHOTOS = 50;
 
   var doc = global.document;
   var Catalog = global.BibimCatalog;
@@ -26,8 +32,13 @@
     quick: { count: 0 },
     camera: { stream: null },
     bulk: [],
+    bulkDropped: 0,
     draft: newDraft(),
-    objectUrls: []
+    apiCandidates: [],
+    sw: { supported: false, state: '등록 전', updateReady: false },
+    // 썸네일용과 상세 사진용을 나눠 담는다. 한 배열에 섞으면 초안을 비울 때
+    // 아직 화면에 떠 있는 상세 사진 주소까지 같이 무효가 되어 이미지가 깨진다.
+    objectUrls: { draft: [], detail: [] }
   };
 
   function newDraft() {
@@ -73,41 +84,79 @@
     toastTimer = global.setTimeout(function () { node.hidden = true; }, 3600);
   }
 
-  /** 버튼이 여러 개인 확인 대화상자. 중복 기록 확인 등에 쓴다. */
+  /**
+   * 버튼이 여러 개인 확인 대화상자. 중복 기록 확인 등에 쓴다.
+   * Esc 로 닫으면 null 이 나온다. 부르는 쪽은 모두 null 을 '취소'로 처리한다.
+   */
   function askDialog(title, body, actions) {
     return new Promise(function (resolve) {
       var backdrop = $('dialog-backdrop');
+      var opener = doc.activeElement;
       $('dialog-title').textContent = title;
       $('dialog-body').textContent = body;
       var holder = $('dialog-actions');
       holder.innerHTML = '';
+
+      function close(value) {
+        doc.removeEventListener('keydown', onKey, true);
+        backdrop.hidden = true;
+        // 대화상자를 연 버튼으로 초점을 돌려 준다. 화면 낭독기가 길을 잃지 않게.
+        if (opener && opener.focus) {
+          try { opener.focus(); } catch (err) { void err; }
+        }
+        resolve(value);
+      }
+
+      // 열려 있는 동안 Tab 이 대화상자 밖으로 빠져나가지 않게 가둔다.
+      function onKey(event) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          close(null);
+          return;
+        }
+        if (event.key !== 'Tab') return;
+        var buttons = Array.prototype.slice.call(holder.querySelectorAll('button'));
+        if (!buttons.length) return;
+        var at = buttons.indexOf(doc.activeElement);
+        var next = event.shiftKey ? at - 1 : at + 1;
+        if (at === -1) next = 0;
+        if (next < 0) next = buttons.length - 1;
+        if (next >= buttons.length) next = 0;
+        event.preventDefault();
+        buttons[next].focus();
+      }
+
       actions.forEach(function (action, index) {
         var btn = doc.createElement('button');
         btn.type = 'button';
         btn.className = 'btn' + (index === 0 ? ' btn--primary' : '') + (action.danger ? ' btn--danger' : '');
         btn.textContent = action.label;
-        btn.addEventListener('click', function () {
-          backdrop.hidden = true;
-          resolve(action.value);
-        });
+        btn.addEventListener('click', function () { close(action.value); });
         holder.appendChild(btn);
       });
+
+      doc.addEventListener('keydown', onKey, true);
       backdrop.hidden = false;
       var first = holder.querySelector('button');
       if (first) first.focus();
     });
   }
 
-  function trackUrl(url) {
-    state.objectUrls.push(url);
+  /** 만들어 둔 blob 주소를 용도별로 적어 둔다. bucket: 'draft' | 'detail' */
+  function trackUrl(url, bucket) {
+    (state.objectUrls[bucket] || state.objectUrls.draft).push(url);
     return url;
   }
 
-  function releaseUrls() {
-    state.objectUrls.forEach(function (url) {
-      try { global.URL.revokeObjectURL(url); } catch (err) { void err; }
+  /** bucket 을 주면 그 묶음만, 안 주면 전부 놓아 준다. */
+  function releaseUrls(bucket) {
+    var buckets = bucket ? [bucket] : Object.keys(state.objectUrls);
+    buckets.forEach(function (key) {
+      (state.objectUrls[key] || []).forEach(function (url) {
+        try { global.URL.revokeObjectURL(url); } catch (err) { void err; }
+      });
+      state.objectUrls[key] = [];
     });
-    state.objectUrls = [];
   }
 
   function toneClass(tone) { return 'badge badge--' + tone; }
@@ -121,17 +170,36 @@
 
   function setupTabs() {
     var tabs = Array.prototype.slice.call(doc.querySelectorAll('.tab'));
-    tabs.forEach(function (tab) {
-      tab.addEventListener('click', function () {
-        tabs.forEach(function (other) {
-          var panel = $(other.getAttribute('data-panel'));
-          var active = other === tab;
-          other.classList.toggle('is-active', active);
-          other.setAttribute('aria-selected', active ? 'true' : 'false');
-          if (panel) panel.hidden = !active;
-        });
-        if (tab.getAttribute('data-panel') === 'panel-map') onMapTabShown();
-        if (tab.getAttribute('data-panel') === 'panel-results') renderResults();
+
+    function activate(tab) {
+      tabs.forEach(function (other) {
+        var panel = $(other.getAttribute('data-panel'));
+        var active = other === tab;
+        other.classList.toggle('is-active', active);
+        other.setAttribute('aria-selected', active ? 'true' : 'false');
+        // 탭 묶음 안에서는 선택된 탭 하나만 Tab 키로 잡힌다(roving tabindex).
+        other.setAttribute('tabindex', active ? '0' : '-1');
+        if (panel) panel.hidden = !active;
+      });
+      if (tab.getAttribute('data-panel') === 'panel-map') onMapTabShown();
+      if (tab.getAttribute('data-panel') === 'panel-results') renderResults();
+    }
+
+    tabs.forEach(function (tab, index) {
+      tab.setAttribute('tabindex', tab.classList.contains('is-active') ? '0' : '-1');
+      tab.addEventListener('click', function () { activate(tab); });
+
+      // 화살표·Home·End 로 탭을 옮긴다(WAI-ARIA tablist 관행).
+      tab.addEventListener('keydown', function (event) {
+        var next = null;
+        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = tabs[(index + 1) % tabs.length];
+        else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = tabs[(index - 1 + tabs.length) % tabs.length];
+        else if (event.key === 'Home') next = tabs[0];
+        else if (event.key === 'End') next = tabs[tabs.length - 1];
+        if (!next) return;
+        event.preventDefault();
+        activate(next);
+        next.focus();
       });
     });
   }
@@ -194,6 +262,8 @@
       state.draft.enteredName = '';
       state.draft.acceptedUnknown = false;
       state.draft.categorySnapshotOverride = null;
+      state.draft.idMethod = null;
+      state.apiCandidates = [];
       state.quick.count = 0;
       $('candidate-list').innerHTML = '';
       $('name-hint').textContent = '';
@@ -599,6 +669,7 @@
       enteredName: state.draft.enteredName,
       acceptedUnknown: state.draft.acceptedUnknown,
       categorySnapshotOverride: state.draft.categorySnapshotOverride,
+      idMethod: state.draft.idMethod,
       note: $('note-input').value,
       quickCount: state.quick.count,
       savedAt: new Date().toISOString()
@@ -630,6 +701,7 @@
       return false;
     }
     state.draft.enteredName = saved.enteredName || '';
+    state.draft.idMethod = saved.idMethod || null;
     state.draft.note = saved.note || '';
     $('note-input').value = saved.note || '';
     state.quick.count = saved.quickCount || 0;
@@ -672,6 +744,14 @@
     $('photo-input').addEventListener('change', function (event) {
       var files = Array.prototype.slice.call(event.target.files || []);
       if (!files.length) return;
+      var room = MAX_DRAFT_PHOTOS - state.draft.photos.length;
+      if (room <= 0) {
+        event.target.value = '';
+        setStatus('photo-hint', '사진은 기록 하나에 ' + MAX_DRAFT_PHOTOS + '장까지입니다. 먼저 저장하거나 몇 장을 빼 주세요.', 'warn');
+        return;
+      }
+      var dropped = Math.max(0, files.length - room);
+      files = files.slice(0, room);
       setStatus('photo-hint', '사진을 줄이는 중...', null);
       var chain = Promise.resolve();
       var failures = [];
@@ -685,10 +765,13 @@
       chain.then(function () {
         event.target.value = '';
         renderThumbs();
+        var over = dropped ? ' ' + dropped + '장은 ' + MAX_DRAFT_PHOTOS + '장 제한으로 제외했습니다.' : '';
         if (failures.length) {
-          setStatus('photo-hint', '일부 사진을 첨부하지 못했습니다. ' + failures.join(' / '), 'error');
+          setStatus('photo-hint', '일부 사진을 첨부하지 못했습니다. ' + failures.join(' / ') + over, 'error');
         } else {
-          setStatus('photo-hint', '사진 ' + state.draft.photos.length + '장 준비. 저장을 눌러야 기기에 남는다.', 'ok');
+          setStatus('photo-hint',
+            '사진 ' + state.draft.photos.length + '장 준비. 저장을 눌러야 기기에 남는다.' + over,
+            dropped ? 'warn' : 'ok');
         }
       });
     });
@@ -791,6 +874,9 @@
 
   function takeShot() {
     if (!state.camera.stream) return Promise.reject(new Error('카메라가 꺼져 있습니다.'));
+    if (state.draft.photos.length >= MAX_DRAFT_PHOTOS) {
+      return Promise.reject(new Error('사진은 기록 하나에 ' + MAX_DRAFT_PHOTOS + '장까지입니다. 먼저 저장하거나 몇 장을 빼 주세요.'));
+    }
     return Photo.captureFromVideo($('camera-view'), state.draft.editingId || 'draft')
       .then(function (photo) {
         state.draft.photos.push(photo);
@@ -809,8 +895,10 @@
 
   function renderThumbs() {
     var holder = $('photo-thumbs');
+    // 다시 그릴 때마다 새 주소를 만드므로, 직전 썸네일 주소는 여기서 놓아 준다.
+    releaseUrls('draft');
     holder.innerHTML = state.draft.photos.map(function (photo) {
-      var url = trackUrl(Photo.objectUrl(photo));
+      var url = trackUrl(Photo.objectUrl(photo), 'draft');
       return '<div class="thumb"><img src="' + esc(url) + '" alt="첨부한 현장 사진">' +
         '<button type="button" data-photo-id="' + esc(photo.id) + '" aria-label="이 사진 빼기">×</button></div>';
     }).join('');
@@ -833,6 +921,10 @@
         $('btn-bulk-import').disabled = true;
         return;
       }
+      // 한 번에 너무 많이 받으면 리사이즈가 밀려 화면이 멈춘 것처럼 보인다. 나눠 올리게 한다.
+      var bulkDropped = Math.max(0, files.length - MAX_BULK_PHOTOS);
+      files = files.slice(0, MAX_BULK_PHOTOS);
+      state.bulkDropped = bulkDropped;
       setStatus('bulk-status', '사진 ' + files.length + '장에서 위치를 읽는 중...', null);
 
       var chain = Promise.resolve();
@@ -874,10 +966,13 @@
 
     $('bulk-preview').innerHTML = '<ul class="obs-list">' + rows.join('') + '</ul>';
     $('btn-bulk-import').disabled = withCoord.length === 0;
+    var over = state.bulkDropped
+      ? ' 한 번에 ' + MAX_BULK_PHOTOS + '장까지만 읽으므로 ' + state.bulkDropped + '장은 제외했습니다. 나머지는 다시 올려 주세요.'
+      : '';
     setStatus('bulk-status',
       '사진 ' + state.bulk.length + '장 중 ' + withCoord.length + '장에 위치가 있습니다.' +
-      (withCoord.length ? '' : ' 아래 "좌표가 없다고 나올 때"를 확인해 주세요.'),
-      withCoord.length ? 'ok' : 'warn');
+      (withCoord.length ? '' : ' 아래 "좌표가 없다고 나올 때"를 확인해 주세요.') + over,
+      withCoord.length && !state.bulkDropped ? 'ok' : 'warn');
   }
 
   function runBulkImport() {
@@ -960,6 +1055,7 @@
       setStatus('bulk-status', parts.join(', ') + '.', imported ? 'ok' : 'warn');
       if (imported) toast('사진에서 ' + imported + '건을 가져왔습니다');
       state.bulk = [];
+      state.bulkDropped = 0;
       $('bulk-input').value = '';
       $('bulk-preview').innerHTML = '';
     }).catch(function (err) {
@@ -1111,10 +1207,16 @@
     var others = state.observations.filter(function (o) { return o.id !== state.draft.editingId; });
     var dupes = Loc.findNearbyDuplicates(fix, name, others);
     if (!dupes.length) { performSave(name, fix); return; }
-    var t = Loc.thresholds();
+    // 실제로 쓰인 반경을 그대로 보여 준다. 설정값만 보여 주면 정확도가 나쁜 날
+    // "8m 안에 있습니다"라고 말하면서 25m로 걸러내는 꼴이 된다.
+    var radius = Math.round(Loc.effectiveDuplicateRadius(fix));
+    var gap = Math.round(Loc.distanceMeters(fix, { lat: dupes[0].lat, lng: dupes[0].lng }));
     askDialog(
       '같은 식물이 이미 기록되어 있습니다',
-      '"' + name + '"이(가) 약 ' + t.duplicateRadiusM + 'm 안에 ' + dupes.length + '건 있습니다. 어떻게 할까요?',
+      '"' + name + '"이(가) 적용 반경 ' + radius + 'm 안에 ' + dupes.length + '건 있습니다. ' +
+      '가장 가까운 기록은 약 ' + gap + 'm 거리입니다' +
+      (typeof fix.accuracyMeters === 'number' ? ' (이번 측정 정확도 약 ' + fix.accuracyMeters + 'm)' : '') +
+      '. 어떻게 할까요?',
       [
         { label: '새로 기록', value: 'new' },
         { label: '기존 기록 보기', value: 'open' },
@@ -1196,8 +1298,9 @@
   }
 
   function resetDraft() {
-    releaseUrls();
+    releaseUrls('draft');
     state.draft = newDraft();
+    state.apiCandidates = [];
     state.quick.count = 0;
     clearPersistedDraft();
     $('name-input').value = '';
@@ -1404,9 +1507,11 @@
     if (!obs) { card.hidden = true; return; }
     var plant = obs.plantId ? Catalog.getById(obs.plantId) : null;
     Storage.listPhotosFor(id).then(function (photos) {
+      // 직전에 열어 둔 상세 사진 주소만 놓는다. 초안 썸네일은 건드리지 않는다.
+      releaseUrls('detail');
       var photoHtml = photos.length
         ? '<div class="obs-photos">' + photos.map(function (p) {
-          return '<img src="' + esc(trackUrl(Photo.objectUrl(p))) + '" alt="현장 사진">';
+          return '<img src="' + esc(trackUrl(Photo.objectUrl(p), 'detail')) + '" alt="현장 사진">';
         }).join('') + '</div>'
         : '<p class="muted">저장된 사진이 없다.</p>';
 
@@ -1443,14 +1548,17 @@
     var obs = findObs(id);
     if (!obs) return;
     Storage.listPhotosFor(id).then(function (photos) {
-      releaseUrls();
+      releaseUrls('draft');
       state.draft = newDraft();
+      state.apiCandidates = [];
       state.draft.editingId = obs.id;
       state.draft.createdAt = obs.createdAt;
       state.draft.enteredName = obs.enteredName;
       state.draft.plant = obs.plantId ? Catalog.getById(obs.plantId) : null;
       state.draft.acceptedUnknown = !state.draft.plant;
       state.draft.categorySnapshotOverride = state.draft.plant ? null : obs.categorySnapshot;
+      // 수정했다고 식별 경로가 바뀐 것은 아니다. 원래 값을 그대로 들고 간다.
+      state.draft.idMethod = obs.identificationMethod || null;
       state.draft.photos = photos.slice();
       state.draft.originalPhotoIds = (obs.photoIds || []).slice();
       state.draft.fix = {
@@ -1790,10 +1898,13 @@
     var pending = Catalog.all().filter(function (p) {
       return p.verificationStatus !== 'verified';
     }).length;
+    // 참고 그림이 몇 종에 붙어 있는지 드러낸다. 빠진 종이 눈에 보여야 채울 수 있다.
+    var drawn = Catalog.all().filter(function (p) { return !!p.referenceImage; }).length;
     $('catalog-meta').textContent = '도감 버전 ' + Catalog.catalogVersion() +
       ' · 전체 ' + counts.total + '종(교란 ' + counts['invasive-designated'] +
       ' / 외래 ' + counts['alien-unlisted'] + ' / 토종 ' + counts.native +
       ' / 확인 필요 ' + counts['needs-check'] + ') · 표시 ' + plants.length + '종' +
+      ' · 참고 그림 ' + drawn + '종' +
       ' · 지정 여부는 고시와 대조했고, ' + pending + '종은 토종/외래 구분이 아직 미검증이다.';
 
     if (!plants.length) {
@@ -1823,9 +1934,12 @@
         parts.push('<img class="plant__img" src="' + esc(plant.referenceImage) + '" alt="' + esc(plant.nameKo) + ' 참고 그림">');
         parts.push('<p class="plant__src">' + esc(plant.imageCredit) + ' · ' + esc(plant.imageLicense) + '</p>');
       }
-      parts.push('<p class="plant__src">출처: ' + (plant.sourceUrl
-        ? '<a href="' + esc(plant.sourceUrl) + '" target="_blank" rel="noopener">' + esc(plant.sourceUrl) + '</a>'
-        : '미기재') + ' · 기준일 ' + esc(plant.reviewedAt || '미기재') +
+      // http(s) 가 아닌 주소는 링크로 걸지 않는다(백업으로 들어온 임시 항목 대비).
+      var source = Catalog.safeUrl(plant.sourceUrl);
+      parts.push('<p class="plant__src">출처: ' + (source
+        ? '<a href="' + esc(source) + '" target="_blank" rel="noopener">' + esc(source) + '</a>'
+        : (plant.sourceUrl ? esc(plant.sourceUrl) + ' (링크 아님)' : '미기재')) +
+        ' · 기준일 ' + esc(plant.reviewedAt || '미기재') +
         ' · 검토 상태 ' + esc(plant.verificationStatus) + '</p>');
       if (plant.isTeamEntry) {
         parts.push('<button type="button" class="btn" data-team-remove="' + esc(plant.id) + '">임시 항목 지우기</button>');
@@ -2038,6 +2152,8 @@
     lines.push('보안 연결(HTTPS): ' + (global.isSecureContext
       ? 'OK' : '아니오 ← 이러면 위치 권한을 못 받습니다'));
     lines.push('인터넷: ' + (global.navigator.onLine === false ? '끊김' : '연결됨'));
+    lines.push('오프라인 보관: ' + state.sw.state +
+      (state.sw.updateReady ? ' (새 버전 대기 중 — 새로고침하세요)' : ''));
     lines.push('지도 백엔드: ' + (state.mapView ? state.mapView.backend() : '없음') +
       (state.mapTried ? '' : ' (지도 탭을 아직 안 열었음)'));
     lines.push('Pl@ntNet 키: ' + (Identify.isConfigured() ? '저장됨' : '없음 ← 사진 식별이 안 됩니다'));
@@ -2062,6 +2178,20 @@
         void err;
         return '설정 저장(localStorage): 실패 ← 사생활 보호 모드면 키가 저장되지 않습니다';
       }
+    }));
+
+    // 휴대폰이 최신 파일을 받았는지 눈으로 확인한다. 캐시 이름에 빌드 값이 들어 있다.
+    checks.push(Promise.resolve().then(function () {
+      if (!global.caches || !global.caches.keys) return '오프라인 캐시: 확인 불가(브라우저가 지원하지 않음)';
+      return global.caches.keys().then(function (keys) {
+        var mine = keys.filter(function (key) { return key.indexOf('bibimbot-shell-') === 0; });
+        if (!mine.length) return '오프라인 캐시: 비어 있음 ← 인터넷이 있을 때 앱을 한 번 더 열어 주세요';
+        var matched = mine.indexOf('bibimbot-shell-' + BUILD) !== -1;
+        return '오프라인 캐시: ' + mine.join(', ') +
+          (matched ? ' (빌드와 일치)' : ' ← 빌드 ' + BUILD + '와 다릅니다. 설정 탭에서 업데이트 확인을 누르세요');
+      }).catch(function () {
+        return '오프라인 캐시: 확인 불가';
+      });
     }));
 
     checks.push(Promise.resolve().then(function () {
@@ -2137,6 +2267,72 @@
     });
   }
 
+  /* ── 오프라인 보관 (서비스 워커) ────────────────────────────
+   * 앱 파일을 기기에 담아 두어 인터넷이 끊겨도 앱이 열리게 한다.
+   * 무엇을 담고 무엇을 안 담는지는 sw.js 맨 위 주석에 적어 두었다.
+   *
+   * 새 버전을 받아도 화면을 저절로 새로고침하지는 않는다. 첨부해 둔 사진은
+   * 저장 전까지 메모리에만 있어서, 멋대로 새로고침하면 현장에서 찍은 사진이 날아간다.
+   */
+
+  function setupServiceWorker() {
+    var btn = $('btn-check-update');
+    var container = global.navigator.serviceWorker;
+
+    if (!container) {
+      state.sw.state = '지원 안 함';
+      setStatus('offline-status', '이 브라우저는 오프라인 보관을 지원하지 않습니다. 인터넷이 있을 때만 앱이 열립니다.', 'warn');
+      btn.disabled = true;
+      return;
+    }
+    if (!global.isSecureContext) {
+      state.sw.state = '보안 연결 아님';
+      setStatus('offline-status', 'HTTPS 주소(또는 localhost)에서만 오프라인 보관이 켜집니다.', 'warn');
+      btn.disabled = true;
+      return;
+    }
+
+    state.sw.supported = true;
+    state.sw.state = '등록 중';
+
+    container.register('sw.js').then(function (registration) {
+      state.sw.state = registration.active ? '켜짐' : '처음 담는 중';
+      setStatus('offline-status', registration.active
+        ? '앱이 이 기기에 담겨 있습니다. 인터넷 없이도 열립니다.'
+        : '앱을 기기에 담는 중입니다. 잠시 뒤 새로고침하면 인터넷 없이도 열립니다.', 'ok');
+
+      registration.addEventListener('updatefound', function () {
+        var incoming = registration.installing;
+        if (!incoming) return;
+        incoming.addEventListener('statechange', function () {
+          if (incoming.state !== 'installed') return;
+          if (!container.controller) return;      // 첫 설치다. 알릴 새 버전이 아니다.
+          state.sw.updateReady = true;
+          state.sw.state = '새 버전 대기';
+          setStatus('offline-status', '새 버전을 받았습니다. 새로고침하면 적용됩니다.', 'ok');
+          toast('새 버전을 받았습니다. 새로고침하면 적용됩니다.');
+        });
+      });
+
+      btn.addEventListener('click', function () {
+        setStatus('offline-status', '업데이트를 확인하는 중...', null);
+        registration.update().then(function () {
+          if (!state.sw.updateReady) {
+            setStatus('offline-status', '최신 버전입니다. (빌드 ' + BUILD + ')', 'ok');
+          }
+        }).catch(function (err) {
+          setStatus('offline-status',
+            '확인하지 못했습니다: ' + ((err && err.message) || '알 수 없는 오류') + ' 인터넷 연결을 확인해 주세요.', 'error');
+        });
+      });
+    }).catch(function (err) {
+      state.sw.state = '실패 — ' + ((err && err.message) || '알 수 없는 오류');
+      btn.disabled = true;
+      setStatus('offline-status',
+        '오프라인 보관을 켜지 못했습니다: ' + ((err && err.message) || '알 수 없는 오류'), 'error');
+    });
+  }
+
   /* ── 공통 렌더 / 부트 ──────────────────────────────────────── */
 
   function renderAll() {
@@ -2201,6 +2397,7 @@
     setupCatalogTab();
     setupSettings();
     setupDiagnostics();
+    setupServiceWorker();
     renderCatalog();
     renderFix();
 
@@ -2225,7 +2422,8 @@
         showFatal(err && err.message ? err.message : String(err));
       });
 
-    global.addEventListener('pagehide', releaseUrls);
+    // 이벤트 객체가 bucket 인자로 새어 들어가지 않게 감싼다.
+    global.addEventListener('pagehide', function () { releaseUrls(); });
   }
 
   if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', boot);

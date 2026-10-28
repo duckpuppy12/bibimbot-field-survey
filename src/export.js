@@ -274,6 +274,21 @@
     }
     if (!Array.isArray(data.observations)) errors.push('기록 목록이 배열이 아닙니다.');
     if (data.photos && !Array.isArray(data.photos)) errors.push('사진 목록이 배열이 아닙니다.');
+    if (data.surveys && !Array.isArray(data.surveys)) errors.push('조사 목록이 배열이 아닙니다.');
+    if (data.teamPlants && !Array.isArray(data.teamPlants)) errors.push('팀 임시 항목 목록이 배열이 아닙니다.');
+
+    // 임시 항목은 도감 화면에 이름과 출처 링크로 그려진다. 모양이 틀린 항목은 들이지 않는다.
+    if (Array.isArray(data.teamPlants)) {
+      data.teamPlants.forEach(function (plant, i) {
+        var where = '임시 항목 ' + (i + 1) + '번: ';
+        if (!plant || typeof plant !== 'object') { errors.push(where + '내용을 읽을 수 없습니다.'); return; }
+        if (typeof plant.id !== 'string' || !plant.id) errors.push(where + 'id가 없습니다.');
+        if (typeof plant.nameKo !== 'string' || !plant.nameKo.trim()) errors.push(where + '이름이 없습니다.');
+        if (plant.sourceUrl && !global.BibimCatalog.safeUrl(plant.sourceUrl)) {
+          errors.push(where + '출처 주소가 http(s)가 아닙니다.');
+        }
+      });
+    }
 
     if (Array.isArray(data.observations)) {
       data.observations.forEach(function (obs, i) {

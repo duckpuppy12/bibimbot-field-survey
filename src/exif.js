@@ -115,7 +115,9 @@
   }
 
   function parseExifDate(text) {
-    // "YYYY:MM:DD HH:MM:SS" — 찍은 기기의 현지 시각이다.
+    // "YYYY:MM:DD HH:MM:SS" — 찍은 기기의 현지 시각이고, 시간대 정보가 들어 있지 않다.
+    // 그래서 '올리는 기기'의 시간대로 읽는다. 국내에서 찍고 국내에서 올리면 맞지만,
+    // 다른 시간대에서 찍은 사진을 가져오면 그 시차만큼 어긋난다. 조사 범위상 문제되지 않는다.
     var m = /^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(String(text || ''));
     if (!m) return null;
     var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6]));

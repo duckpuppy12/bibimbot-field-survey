@@ -73,6 +73,17 @@
     return basePlants.concat(teamPlants);
   }
 
+  /**
+   * 화면에 링크로 걸어도 되는 주소만 통과시킨다.
+   * 임시 항목은 백업 파일을 통해서도 들어오므로, 조작된 백업이 javascript: 같은
+   * 주소를 도감 탭 링크에 심지 못하게 여기서 한 번 거른다.
+   */
+  function safeUrl(value) {
+    var text = String(value == null ? '' : value).trim();
+    if (!text) return '';
+    return /^https?:\/\//i.test(text) ? text : '';
+  }
+
   /** 팀이 추가한 임시 항목은 검증 전까지 '확인 필요'를 유지한다(FR-11). */
   function normalizeTeamPlant(raw) {
     return {
@@ -90,7 +101,7 @@
       referenceImage: '',
       imageCredit: '',
       imageLicense: '',
-      sourceUrl: raw.sourceUrl || '',
+      sourceUrl: safeUrl(raw.sourceUrl),
       reviewedAt: '',
       verificationStatus: 'team-added',
       isTeamEntry: true,
@@ -249,6 +260,7 @@
     counts: counts,
     lookAlikes: lookAlikes,
     catalogVersion: catalogVersion,
+    safeUrl: safeUrl,
     setTeamPlants: setTeamPlants,
     getTeamPlants: getTeamPlants,
     normalizeTeamPlant: normalizeTeamPlant

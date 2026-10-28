@@ -181,11 +181,32 @@
       return initOsm();
     }
 
+    /**
+     * 이미 떠 있는 지도를 걷어낸다.
+     * Leaflet 은 컨테이너에 _leaflet_id 를 심어 두기 때문에 innerHTML 만 비우고
+     * 다시 L.map() 을 부르면 "Map container is already initialized" 로 터진다.
+     * remove() 를 거쳐야 그 표시가 지워진다.
+     */
+    function teardownMap() {
+      if (state.map && state.backend === 'osm' && state.map.remove) {
+        try { state.map.remove(); } catch (err) { void err; }
+      }
+      clearMarkers();
+      state.meMarker = null;
+      if (state.accuracyCircle && state.accuracyCircle.setMap) {
+        try { state.accuracyCircle.setMap(null); } catch (err) { void err; }
+      }
+      state.accuracyCircle = null;
+      state.map = null;
+      state.layer = null;
+      container.innerHTML = '';
+    }
+
     function initOsm() {
       return loadLeaflet().then(function (L) {
         state.L = L;
         container.classList.remove('is-fallback');
-        container.innerHTML = '';
+        teardownMap();
         var start = center();
         state.map = L.map(container, { zoomControl: true, attributionControl: true })
           .setView([start.lat, start.lng], 16);
@@ -216,7 +237,7 @@
       return loadGoogle(apiKey).then(function (maps) {
         state.maps = maps;
         container.classList.remove('is-fallback');
-        container.innerHTML = '';
+        teardownMap();
         state.map = new maps.Map(container, {
           center: center(),
           zoom: 16,

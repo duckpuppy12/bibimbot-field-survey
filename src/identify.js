@@ -49,7 +49,10 @@
     var sci = species.scientificNameWithoutAuthor || '';
     // 별칭·학명까지 보는 정확 일치만 쓴다. 느슨하게 맞추면 엉뚱한 종으로 이어질 수 있다.
     var plant = sci && global.BibimCatalog ? global.BibimCatalog.exactMatch(sci) : null;
-    var verdict = global.BibimCatalog.decide(plant);
+    // 도감 모듈이 없으면 판정도 없다. 없는 채로 .decide() 를 부르면 여기서 터진다.
+    var verdict = global.BibimCatalog
+      ? global.BibimCatalog.decide(plant)
+      : { category: 'needs-check', meta: { label: '확인 필요', short: '확인', icon: '■', tone: 'purple' } };
     return {
       scientificName: sci,
       authorship: species.scientificNameAuthorship || '',

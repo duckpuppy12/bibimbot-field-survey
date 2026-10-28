@@ -4,9 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light">
+<meta name="theme-color" content="#1f6f4a">
 <title>토종 지킴이 비빔봇 · 현장조사</title>
 <meta name="description" content="외래 식물 이름 확인, 위험도 판정, GPS 위치 기록을 하나로 묶는 현장조사 웹앱">
 <link rel="stylesheet" href="styles.css">
+<!-- 홈 화면에 설치하면 인터넷이 끊겨도 앱이 열린다. 담는 범위는 sw.js 주석에 적어 두었다. -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="images/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="images/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="비빔봇">
 </head>
 <body>
 
@@ -53,7 +60,10 @@
 
       <!-- capture 속성을 붙이면 Android가 앨범을 건너뛰고 카메라로 바로 간다. 그래서 쓰지 않는다. -->
       <input class="sr-only" id="photo-input" type="file" accept="image/*" multiple>
-      <p class="muted">긴 변 1600px로 줄인 사본만 앱에 저장한다. 휴대폰의 원본 사진은 그대로 남는다.</p>
+      <p class="muted">
+        긴 변 1600px로 줄인 사본만 앱에 저장한다. 휴대폰의 원본 사진은 그대로 남는다.
+        기록 하나에 <strong>최대 10장</strong>까지 담는다. 식별에 보내는 것은 앞의 5장이다.
+      </p>
       <div class="thumbs" id="photo-thumbs"></div>
       <p class="hint" id="photo-hint"></p>
 
@@ -362,6 +372,23 @@
       <pre class="diag" id="diag-output" aria-live="polite">아직 확인하지 않았다.</pre>
       <button type="button" class="btn" id="btn-test-plantnet">Pl@ntNet 연결 시험 (하루 500건 중 1건 사용)</button>
       <p class="status" id="plantnet-test-status" role="status"></p>
+    </div>
+
+    <div class="card">
+      <h2 class="card__title">오프라인으로 쓰기</h2>
+      <p class="muted">
+        이 앱은 한 번 열어 두면 <strong>기기에 담겨</strong> 인터넷이 없어도 열린다.
+        하천변에서 데이터가 끊겨도 기록·빠른 기록·GPS는 그대로 된다.
+        지도 그림만 간이 좌표판으로 바뀐다.
+      </p>
+      <p class="muted">
+        홈 화면에 두려면 — <strong>Android Chrome</strong>: 오른쪽 위 ⋮ → "앱 설치" 또는 "홈 화면에 추가".
+        <strong>iPhone Safari</strong>: 아래 공유 버튼 → "홈 화면에 추가".
+      </p>
+      <div class="btn-row">
+        <button type="button" class="btn" id="btn-check-update">업데이트 확인</button>
+      </div>
+      <p class="status" id="offline-status" role="status"></p>
     </div>
 
     <div class="callout">
