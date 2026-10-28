@@ -266,6 +266,19 @@ textarea.input { min-height: 72px; resize: vertical; }
 .verdict__credit { font-size: 0.74rem; color: var(--ink-soft); margin: 4px 0 0; }
 
 /* ── 사진 썸네일 ────────────────────────────────────────────── */
+/* 파일 입력은 눈에서 감추고, 모양을 맞춘 버튼으로 대신 연다. 기능은 그대로다. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .camera__view {
   width: 100%;
   max-height: 300px;

@@ -3,7 +3,7 @@
   'use strict';
 
   // 배포본이 최신인지 자가 진단에서 눈으로 확인하려고 둔다. 고칠 때마다 올린다.
-  var BUILD = '2026-10-28.5';
+  var BUILD = '2026-10-28.6';
 
   var doc = global.document;
   var Catalog = global.BibimCatalog;
@@ -715,6 +715,9 @@
       if (autoBox.checked && !state.camera.stream) startCamera();
     });
 
+    // 파일 입력은 감춰 두고 버튼으로 연다. 기본 "파일 선택" 상자는 작고 눌러야 할 곳처럼 보이지 않는다.
+    $('btn-pick-album').addEventListener('click', function () { $('photo-input').click(); });
+
     $('btn-camera-start').addEventListener('click', function () { startCamera(); });
     $('btn-camera-stop').addEventListener('click', stopCamera);
     $('btn-camera-shot').addEventListener('click', function () {
@@ -820,6 +823,8 @@
    */
 
   function setupBulkImport() {
+    $('btn-pick-bulk').addEventListener('click', function () { $('bulk-input').click(); });
+
     $('bulk-input').addEventListener('change', function (event) {
       var files = Array.prototype.slice.call(event.target.files || []);
       state.bulk = [];

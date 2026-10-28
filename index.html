@@ -39,6 +39,7 @@
       <div class="camera" id="camera-box">
         <div class="btn-row">
           <button type="button" class="btn btn--primary" id="btn-camera-start">카메라 켜기</button>
+          <button type="button" class="btn btn--primary" id="btn-pick-album">앨범에서 고르기</button>
           <button type="button" class="btn" id="btn-camera-stop" hidden>카메라 끄기</button>
         </div>
         <video class="camera__view" id="camera-view" playsinline muted hidden></video>
@@ -50,12 +51,8 @@
         <p class="status" id="camera-status" role="status"></p>
       </div>
 
-      <details class="details">
-        <summary>앨범에서 고르기</summary>
-        <!-- capture 속성을 붙이면 Android가 앨범을 건너뛰고 카메라로 바로 간다. 그래서 쓰지 않는다. -->
-        <input class="file" id="photo-input" type="file" accept="image/*" multiple>
-        <p class="muted">누르면 앨범·파일·카메라 중에서 고를 수 있다.</p>
-      </details>
+      <!-- capture 속성을 붙이면 Android가 앨범을 건너뛰고 카메라로 바로 간다. 그래서 쓰지 않는다. -->
+      <input class="sr-only" id="photo-input" type="file" accept="image/*" multiple>
       <p class="muted">긴 변 1600px로 줄인 사본만 앱에 저장한다. 휴대폰의 원본 사진은 그대로 남는다.</p>
       <div class="thumbs" id="photo-thumbs"></div>
       <p class="hint" id="photo-hint"></p>
@@ -162,8 +159,8 @@
         휴대폰 <strong>기본 카메라</strong>로 찍은 사진에는 찍은 자리의 좌표가 들어 있다.
         현장에서는 찍기만 하고, 돌아와서 한 번에 올리면 좌표가 그대로 핀이 된다.
       </p>
-      <input class="file" id="bulk-input" type="file" accept="image/*" multiple>
-      <p class="muted">누르면 앨범이 열린다. 여러 장을 한 번에 고를 수 있다.</p>
+      <input class="sr-only" id="bulk-input" type="file" accept="image/*" multiple>
+      <button type="button" class="btn btn--primary" id="btn-pick-bulk">앨범에서 사진 여러 장 고르기</button>
       <div id="bulk-preview"></div>
 
       <label class="label" for="bulk-name">이 사진들의 식물 이름 (비우면 '확인 필요'로 저장)</label>
