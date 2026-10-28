@@ -12,7 +12,7 @@
  */
 'use strict';
 
-var VERSION = '2026-10-28.7';
+var VERSION = '2026-10-28.8';
 var CACHE = 'bibimbot-shell-' + VERSION;
 
 // 앱이 열리는 데 필요한 파일 전부. 하나라도 빠지면 오프라인에서 깨진다.

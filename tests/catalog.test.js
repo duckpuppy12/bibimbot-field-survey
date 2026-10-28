@@ -92,6 +92,59 @@ test('지정 종은 모두 verified 이고 지정 분류로 떨어진다', funct
   });
 });
 
+test('법정 지정 목록은 18종으로 고정이다', function () {
+  var win = loadCatalog();
+  // 고시로 정해진 목록이다. 도감에 종을 더하다 실수로 여기에 끼워 넣으면 안 된다.
+  // 고시가 실제로 바뀌었을 때만 이 숫자를 고치고, 근거를 plants.js 머리 주석에 적는다.
+  assert.equal(win.BibimCatalog.counts()['invasive-designated'], 18);
+});
+
+test('지정 종의 학명을 다른 항목이 가로채지 않는다', function () {
+  var win = loadCatalog();
+  var designated = {};
+  win.BibimCatalog.all().filter(function (p) { return p.isDesignatedInvasive; })
+    .forEach(function (p) { designated[p.scientificName] = p.nameKo; });
+
+  win.BibimCatalog.all().filter(function (p) { return !p.isDesignatedInvasive; })
+    .forEach(function (plant) {
+      assert.ok(!designated[plant.scientificName],
+        plant.nameKo + '이(가) 지정 종 학명 ' + plant.scientificName + ' 을 쓰고 있다');
+    });
+});
+
+test('모든 항목이 필수 칸을 채우고 있다', function () {
+  var win = loadCatalog();
+  var seen = {};
+  win.BibimCatalog.all().forEach(function (plant) {
+    assert.ok(plant.id, 'id 없는 항목이 있다');
+    assert.ok(!seen[plant.id], 'id 가 겹친다: ' + plant.id);
+    seen[plant.id] = true;
+    assert.ok(plant.nameKo, plant.id + ': 이름이 없다');
+    assert.ok(plant.scientificName, plant.nameKo + ': 학명이 없다');
+    assert.ok(plant.description, plant.nameKo + ': 설명이 없다');
+    assert.ok(plant.origin, plant.nameKo + ': 원산지 칸이 비었다');
+    assert.ok(['verified', 'needs-review'].indexOf(plant.verificationStatus) !== -1,
+      plant.nameKo + ': 검토 상태 값이 이상하다 — ' + plant.verificationStatus);
+    assert.ok(win.BibimCatalog.safeUrl(plant.sourceUrl), plant.nameKo + ': 출처 주소가 없거나 http(s)가 아니다');
+  });
+});
+
+test('지정 종과 헷갈리는 종에는 구별법이 적혀 있다', function () {
+  var win = loadCatalog();
+  // 같은 속인데 한쪽만 지정이면, 비지정 쪽에 반드시 구별법이 있어야 한다.
+  var designatedGenus = {};
+  win.BibimCatalog.all().filter(function (p) { return p.isDesignatedInvasive; }).forEach(function (p) {
+    designatedGenus[(p.scientificName || '').split(' ')[0]] = p.nameKo;
+  });
+
+  win.BibimCatalog.all().filter(function (p) {
+    return !p.isDesignatedInvasive && designatedGenus[(p.scientificName || '').split(' ')[0]];
+  }).forEach(function (plant) {
+    assert.ok(plant.lookAlikeNote,
+      plant.nameKo + '은(는) 지정 종과 같은 속인데 구별법이 비어 있다');
+  });
+});
+
 test('팀 임시 항목은 뭐라고 넣든 확인 필요로 고정된다', function () {
   var win = loadCatalog();
   var plant = win.BibimCatalog.normalizeTeamPlant({

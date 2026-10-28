@@ -4,7 +4,7 @@
 
   // 배포본이 최신인지 자가 진단에서 눈으로 확인하려고 둔다.
   // 고칠 때마다 올리고, sw.js 의 VERSION 도 같은 값으로 맞춘다(안 맞추면 기기가 옛 파일을 계속 쓴다).
-  var BUILD = '2026-10-28.7';
+  var BUILD = '2026-10-28.8';
 
   // 기록 하나에 담을 수 있는 사진 장수. 저사양 휴대폰에서 리사이즈가 밀리지 않게 막아 둔다.
   var MAX_DRAFT_PHOTOS = 10;
@@ -406,6 +406,7 @@
         return;
       }
       state.lensOpened = true;
+      nudgeLens(false);
       global.navigator.share({ files: files }).then(function () {
         setStatus('identify-status',
           '사진을 보냈습니다. 렌즈에서 이름을 확인한 뒤 돌아와 2단계에 붙여 넣으세요.', 'ok');
@@ -436,10 +437,14 @@
 
       Identify.identify(state.draft.photos, select.value).then(function (result) {
         if (!result.candidates.length) {
-          setStatus('identify-status', '후보를 찾지 못했습니다. ' + framingHint(sent, small), 'warn');
+          nudgeLens(true);
+          setStatus('identify-status',
+            '후보를 찾지 못했습니다. ' + framingHint(sent, small) +
+            ' 바로 쓰려면 위의 "사진을 구글 렌즈로 보내기"가 더 잘 맞습니다.', 'warn');
           return;
         }
         state.apiCandidates = result.candidates;
+        nudgeLens(result.candidates[0].score < Identify.LOW_SCORE);
         renderApiCandidates(result);
         var quota = result.remaining == null ? '' : ' 오늘 남은 횟수 ' + result.remaining + '건.';
         var weak = result.candidates[0].score < Identify.LOW_SCORE;
@@ -449,7 +454,15 @@
           weak ? 'warn' : 'ok');
         $('name-input').scrollIntoView({ block: 'center' });
       }).catch(function (err) {
-        var extra = err.kind === 'no-match' ? ' ' + framingHint(sent, small) : '';
+        var extra = '';
+        if (err.kind === 'no-match') {
+          nudgeLens(true);
+          extra = ' ' + framingHint(sent, small) +
+            ' 바로 쓰려면 위의 "사진을 구글 렌즈로 보내기"가 더 잘 맞습니다.';
+        } else if (err.kind === 'quota' || err.kind === 'bad-key' || err.kind === 'network') {
+          nudgeLens(true);
+          extra = ' 그동안은 위의 "사진을 구글 렌즈로 보내기"를 쓰세요.';
+        }
         setStatus('identify-status', err.message + extra, 'error');
       }).then(function () {
         btn.disabled = false;
@@ -458,13 +471,25 @@
     });
   }
 
-  /** 왜 못 맞혔는지 짚어 준다. 멀리서 한 장 찍은 경우가 대부분이다. */
+  /** 왜 못 맞혔는지 짚어 준다. 멀리서 전경을 찍은 경우가 대부분이다. */
   function framingHint(sent, smallCount) {
     var tips = [];
     if (smallCount) tips.push('사진이 너무 작습니다(짧은 변 ' + Photo.MIN_GOOD_EDGE + 'px 미만)');
-    if (sent.length < 2) tips.push('같은 포기를 2~5장 더 찍어 한 번에 보내면 잘 맞힙니다');
-    tips.push('꽃이나 열매를 화면 가득 채워 가까이 찍으세요');
+    if (sent.length > 1) {
+      // 화단이나 생울타리를 여러 장 찍으면 서로 다른 종이 한 요청에 섞여 들어간다.
+      tips.push('붙인 ' + sent.length + '장을 한 포기로 보고 보냈습니다. 다른 식물이 섞였으면 ×로 빼고 다시 보내세요');
+    } else {
+      tips.push('같은 포기를 2~5장 더 찍어 한 번에 보내면 잘 맞힙니다');
+    }
+    tips.push('꽃이나 열매 한 부위를 화면 가득 채워 가까이 찍으세요');
     return tips.join('. ') + '.';
+  }
+
+  /** Pl@ntNet이 못 맞혔을 때 실제로 잘 맞히는 쪽을 가리킨다. */
+  function nudgeLens(on) {
+    var btn = $('btn-share-lens');
+    if (!btn) return;
+    btn.classList.toggle('btn--nudge', !!on);
   }
 
   function renderApiCandidates(result) {
@@ -1299,6 +1324,7 @@
 
   function resetDraft() {
     releaseUrls('draft');
+    nudgeLens(false);
     state.draft = newDraft();
     state.apiCandidates = [];
     state.quick.count = 0;

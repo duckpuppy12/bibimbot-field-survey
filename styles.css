@@ -308,6 +308,24 @@ textarea.input { min-height: 72px; resize: vertical; }
 .identify__title { margin: 0; font-size: 0.92rem; }
 .identify .btn { width: 100%; margin-top: 10px; }
 
+/* 두 식별 경로를 눈으로 갈라 준다. */
+.rule { border: 0; border-top: 1px solid var(--line); margin: 16px 0 4px; }
+
+/* 보내기 전에 읽어야 하는 한 줄. 경고지만 빨강까지는 아니다. */
+.warn-line {
+  font-size: 0.85rem;
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  color: var(--yellow);
+  background: var(--yellow-bg);
+  border-radius: 8px;
+}
+
+/* 식별이 실패했을 때 "이쪽을 쓰라"고 가리키는 표시. */
+.btn--nudge {
+  box-shadow: 0 0 0 3px var(--yellow-bg), 0 0 0 5px var(--yellow);
+}
+
 .thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .thumb { position: relative; width: 92px; }
 .thumb img {

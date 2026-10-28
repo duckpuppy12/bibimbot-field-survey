@@ -68,10 +68,23 @@
       <p class="hint" id="photo-hint"></p>
 
       <div class="identify" id="identify-box">
+        <p class="callout__title">이름 찾는 길은 둘이다</p>
+        <p class="muted">
+          현장에서 써 보니 <strong>구글 렌즈가 더 잘 맞힌다.</strong> 렌즈로 이름을 확인해 2단계에 붙여 넣는 길을
+          먼저 쓰고, Pl@ntNet은 꽃·열매를 가까이 찍었을 때 보조로 쓴다.
+        </p>
+
+        <button type="button" class="btn btn--primary" id="btn-share-lens">사진을 구글 렌즈로 보내기</button>
+
+        <hr class="rule">
+
         <label class="label" for="organ-select">사진에 찍힌 부분</label>
         <select class="input" id="organ-select"></select>
-        <button type="button" class="btn btn--primary" id="btn-identify-photo">사진으로 이름 찾기</button>
-        <button type="button" class="btn" id="btn-share-lens">사진을 렌즈·다른 앱으로 보내기</button>
+        <p class="warn-line">
+          붙여 둔 사진을 <strong>전부 한 포기로 보고</strong> 한 번에 보낸다.
+          다른 식물이 섞여 있으면 썸네일의 ×로 먼저 빼낸다.
+        </p>
+        <button type="button" class="btn" id="btn-identify-photo">Pl@ntNet으로 이름 찾기</button>
         <p class="status" id="identify-status" role="status"></p>
 
         <details class="details">
@@ -81,9 +94,11 @@
             <li><strong>한 부위를 화면 가득</strong> 채운다. 풀밭 전체를 멀리서 찍으면 거의 못 맞힌다.</li>
             <li><strong>같은 포기를 여러 장</strong>(최대 5장) 찍어 두고 한 번에 보낸다. 부위를 섞어도 좋다.</li>
             <li>초점을 맞추고 흔들리지 않게. 800×800보다 작으면 성능이 보장되지 않는다.</li>
+            <li><strong>한 번에 한 포기만.</strong> 화단 전체나 생울타리를 찍으면 여러 종이 섞여
+            들어가 후보를 못 찾는다. 사진마다 다른 식물이면 따로따로 보낸다.</li>
           </ul>
           <p class="muted">
-            그래도 안 되면 <strong>사진을 렌즈·다른 앱으로 보내기</strong>로 Google 렌즈에 보내 확인한 뒤,
+            그래도 안 되면 <strong>사진을 구글 렌즈로 보내기</strong>를 쓴다. 렌즈에서 이름을 확인한 뒤
             이름을 복사해 2단계에 붙여 넣는다. 렌즈 결과가 앱으로 자동으로 돌아오지는 않는다.
           </p>
         </details>
